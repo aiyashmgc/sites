@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enhanced Gypsum Ceiling Projects</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* Enhanced Gypsum Ceiling Planner Stylesheet
+      This section defines the visual appearance of the application, including colors, layout,
+      and custom components like the Gantt chart and modals.
+    */
+    :root {
+      --primary: #0ea5a5; /* teal accent */
+      --primary-700: #0b7f7f;
+      --secondary: #1b3a6b; /* deep blue button */
+      --bg: #091423; /* page bg */
+      --bg-2: #0c1a2e;
+      --card: #0f223b; /* panels */
+      --text: #e6edf5;
+      --muted: #9fb3c8;
+      --border: #1c3556;
+      --danger: #e53935;
+      --warn: #f59e0b;
+
+      /* Task Status Colors */
+      --status-not-started: #60a5fa; /* blue-500 */
+      --status-in-progress: #f59e0b; /* amber-500 */
+      --status-on-hold: #94a3b8; /* slate-400 */
+      --status-behind-schedule: #ef4444; /* red-500 */
+      --status-completed: #22c55e; /* green-500 */
+      --status-blocked: #78716c; /* stone-500 */
+      --status-urgent-past-start: #f87171; /* red-400 for urgent */
+
+      --label-width: 210px;
+      --day-width: 40px; /* gantt scale */
+      --initial-days: 25; /* desktop default */
+    }
+
+    body {
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, sans-serif;
+      background: radial-gradient(1200px 800px at 20% -10%, #0f2746 0%, var(--bg) 55%),
+                  linear-gradient(160deg, var(--bg-2) 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f223b; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #1c3556; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+    .gantt-viewport, .timeline-viewport {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #071a30;
+      position: relative; /* For dependency lines and today marker */
+    }
+
+    .gantt-grid, .timeline-grid {
+      display: grid;
+      grid-template-columns: var(--label-width) repeat(var(--total-days), var(--day-width));
+    }
+
+    .gantt-months, .gantt-days, .timeline-months, .timeline-days {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+    }
+    .gantt-days, .timeline-days { top: 34px; z-index: 5; }
+
+    .gantt-months .month-cell, .timeline-months .month-cell {
+      text-align: center; font-weight: 800; color: #b4d9ff; background: #0a2a4b;
+      border-bottom: 1px solid #0d3c69; border-right: 1px solid #0d3c69;
+      border-left: 1px solid #0d3c69; padding: 6px 0;
+    }
+    .gantt-days .day-cell, .timeline-days .day-cell {
+      text-align: center; border-bottom: 1px solid #0d3c69;
+      border-right: 1px solid #194a79; border-left: 1px solid #194a79;
+      padding: 6px 0; font-weight: 700; color: #c7e6ff; background: #0b274a;
+    }
+
+    .label-cell {
+      position: sticky; left: 0; background: linear-gradient(180deg, #0b2444, #091b35);
+      z-index: 6; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      padding: 6px 10px; font-weight: 800; color: #eaf6ff;
+    }
+
+    .gantt-row, .timeline-row {
+      display: grid;
+      grid-template-columns: var(--label-width) repeat(var(--total-days), var(--day-width));
+      min-height: 46px; border-top: 1px solid #0c2e52;
+      background: linear-gradient(180deg, #08203c,#091b34);
+      position: relative;
+    }
+    .gantt-row .label-cell, .timeline-row .label-cell {
+      align-self: stretch; display: flex; align-items: center;
+    }
+
+    .task-bar-container {
+      grid-column: 2 / -1; position: relative; display: flex;
+      align-items: center; height: 100%; padding: 0 2px;
+      border-left: 1px solid #16436e;
+    }
+    .task-bar-container::after {
+      content: ''; position: absolute; top: 0; bottom: 0; left: 0; right: 0;
+      background-image: repeating-linear-gradient( to right, transparent, transparent calc(var(--day-width) - 1px), #16436e calc(var(--day-width) - 1px), #16436e var(--day-width) );
+      pointer-events: none; z-index: 1;
+    }
+
+    .task-bar {
+      position: absolute; height: 24px; line-height: 24px; padding: 0 8px;
+      border-radius: 6px; font-weight: 600; font-size: 12px; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: flex; align-items: center; justify-content: center;
+      transition: background-color 0.2s ease, box-shadow 0.2s ease;
+      z-index: 2;
+      cursor: grab;
+      border: 1px solid transparent;
+    }
+    .task-bar:hover {
+        box-shadow: 0 0 10px 2px color-mix(in srgb, var(--primary) 50%, transparent);
+        border-color: var(--primary);
+    }
+    .task-bar.dragging {
+        cursor: grabbing;
+        opacity: 0.8;
+        z-index: 10;
+    }
+    .task-bar .resize-handle {
+        position: absolute; top: 0; bottom: 0; width: 6px; z-index: 3;
+    }
+    .task-bar .resize-handle.left { left: 0; cursor: ew-resize; }
+    .task-bar .resize-handle.right { right: 0; cursor: ew-resize; }
+
+    .gantt-team-header, .timeline-project-header {
+      grid-column: 1 / -1; background: #1a3a60; color: #eaf6ff; font-weight: 700;
+      padding: 8px 10px; border-top: 1px solid #0c2e52; border-bottom: 1px solid #0c2e52;
+      position: sticky; left: 0; z-index: 7; display: flex; align-items: center;
+      justify-content: space-between; gap: 10px;
+    }
+
+    .gantt-area-label, .timeline-area-label { padding-left: 20px; font-weight: 500; color: #c7e6ff; }
+    .gantt-team-label-cell, .timeline-team-label-cell { background: linear-gradient(180deg,#0b2444,#091b35); font-weight: 800; color: #eaf6ff; padding: 6px 10px; }
+    
+    .pie-chart-container {
+      position: relative; width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .pie-chart {
+      width: 100%; height: 100%; border-radius: 50%;
+      background: conic-gradient(var(--status-completed) calc(var(--p) * 1%), var(--border) 0);
+    }
+    .pie-chart-label {
+      position: absolute; font-size: 10px; font-weight: 800; color: white;
+    }
+
+    #dependency-lines-svg {
+      position: absolute;
+      top: 0;
+      left: var(--label-width);
+      width: calc(100% - var(--label-width));
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+      overflow: visible;
+    }
+    .dependency-arrow {
+      stroke: #f59e0b;
+      stroke-width: 1.5;
+      fill: none;
+      marker-end: url(#arrowhead);
+      transition: d 0.3s ease;
+    }
+    
+    .today-marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: rgba(255, 82, 82, 0.7);
+        z-index: 4;
+        pointer-events: none;
+    }
+    .today-marker::before {
+        content: 'Today';
+        position: sticky;
+        top: 4px;
+        left: 4px;
+        background-color: rgba(255, 82, 82, 0.9);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 840px) {
+      :root { --day-width: 34px; --initial-days: 7; --label-width: 180px; }
+    }
+    @media (max-width: 480px) {
+      .header-actions { flex-wrap: wrap; }
+      :root { --day-width: 30px; --label-width: 160px; }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-blue-950 min-h-screen flex flex-col">
+  <header class="bg-gradient-to-b from-blue-900 to-blue-950 text-white p-4 flex items-center justify-between shadow-xl border-b border-blue-800">
+    <h1 id="app-title" class="text-xl md:text-2xl font-bold tracking-wide">Modern Gypsum Ceiling Projects</h1>
+    <nav class="flex gap-2 sm:gap-4 items-center flex-wrap">
+      <button id="btn-toggle-view" class="px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition ease-in-out duration-150">Switch to Dashboard</button>
+      <button id="btn-download-pdf" class="px-4 py-2 bg-teal-500 text-gray-900 font-bold rounded-lg shadow-md hover:bg-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300 focus:ring-opacity-75 transition ease-in-out duration-150">Download PDF</button>
+    </nav>
+  </header>
+
+  <main class="container mx-auto mt-4 flex-grow p-2">
+    <section id="planner-view" class="space-y-4">
+       <section id="project-management" class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-center">
+        <div class="flex items-center gap-2 md:col-span-2 lg:col-span-2">
+          <label for="project-select" class="font-bold text-gray-200 flex-shrink-0">Select Project:</label>
+          <select id="project-select" class="flex-grow min-w-[150px] bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-2 focus:ring-teal-500 focus:border-teal-500"></select>
+        </div>
+        <div class="flex flex-wrap gap-3 lg:col-span-3 justify-start md:justify-end">
+          <button id="btn-new-project" class="px-4 py-2 bg-teal-500 text-gray-900 font-bold rounded-lg shadow-md hover:bg-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300 transition ease-in-out duration-150">New Project</button>
+          <button id="btn-archive-project" class="px-4 py-2 bg-amber-500 text-gray-900 font-bold rounded-lg shadow-md hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300 transition ease-in-out duration-150">Archive Project</button>
+          <button id="btn-delete-project" class="px-4 py-2 bg-red-600 text-white font-bold rounded-lg shadow-md hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-400 transition ease-in-out duration-150">Delete Project</button>
+        </div>
+        <div id="overall-progress-container" class="w-full col-span-full mt-2"></div>
+      </section>
+
+      <section id="areas-container" class="space-y-3">
+        <!-- Area cards will be dynamically inserted here -->
+      </section>
+
+      <div class="flex gap-3">
+        <button id="btn-add-area" class="px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition ease-in-out duration-150">Add New Area</button>
+      </div>
+
+      <section id="view-switcher" class="flex gap-2 mt-4">
+        <button id="btn-gantt-view" class="flex-1 px-4 py-2 bg-teal-600 text-white font-bold rounded-lg shadow-md hover:bg-teal-500 active">Gantt View</button>
+        <button id="btn-legend-view" class="flex-1 px-4 py-2 bg-gray-700 text-gray-200 font-bold rounded-lg shadow-md hover:bg-gray-600">Legend View</button>
+      </section>
+
+      <section id="legend-container" class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg hidden">
+        <h2 class="text-lg font-bold text-gray-100 mb-4">Team Legend & Colors</h2>
+        <ul id="team-legend-list" class="list-none m-0 p-0 max-h-80 overflow-auto space-y-2"></ul>
+        <button id="btn-add-team" class="mt-4 px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition ease-in-out duration-150">Add New Team</button>
+      </section>
+
+      <section id="gantt-planner" class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg mt-4">
+        <h2 class="text-md font-semibold text-gray-100 mb-2">Project Timeline (by Team)</h2>
+        <div class="flex flex-wrap gap-3 mb-4 items-center">
+            <label for="filter-team" class="text-gray-200">Filter by Team:</label>
+            <select id="filter-team" class="bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-2 min-w-[120px]"></select>
+
+            <label for="filter-status" class="text-gray-200">Filter by Status:</label>
+            <select id="filter-status" class="bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-2 min-w-[120px]"></select>
+
+            <button id="btn-clear-filters" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 transition ease-in-out duration-150">Clear Filters</button>
+        </div>
+        <!-- Gantt chart will be dynamically inserted here -->
+        </section>
+    </section>
+
+    <section id="dashboard-view" class="space-y-4 hidden">
+      <h1 class="text-2xl md:text-3xl font-bold text-gray-100 mb-4">Team Activity Dashboard</h1>
+      <section id="dashboard-container" class="space-y-4">
+        <!-- Dashboard content will be dynamically inserted here -->
+      </section>
+    </section>
+  </main>
+
+  <footer class="text-gray-400 text-center p-4 mt-8">© Modern Gypsum Ceiling Projects</footer>
+
+  <script>
+    // =================================================================================
+    // UTILITY FUNCTIONS
+    // Shared helper functions for date manipulation, ID generation, etc.
+    // =================================================================================
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+    function debounce(fn, wait) {
+      let t;
+      return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); };
+    }
+    function parseDateDMY(str) {
+      if (!str) return null;
+      const [dd, mm, yyyy] = str.split('/').map(n => parseInt(n, 10));
+      if (!dd || !mm || !yyyy) return null;
+      return new Date(yyyy, mm - 1, dd);
+    }
+    function formatDateDMY(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yyyy = date.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+    function toISODate(dmy) {
+      const d = parseDateDMY(dmy);
+      if (!d) return '';
+      return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+    }
+    function fromISODate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return formatDateDMY(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+    function monthLabel(date) { return date.toLocaleString(undefined, { month: 'long', year: 'numeric' }); }
+    function diffDays(a, b) {
+      const A = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+      const B = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+      return Math.floor((B - A) / (1000 * 60 * 60 * 24));
+    }
+    function addDays(d, n) {
+      const x = new Date(d);
+      x.setDate(x.getDate() + n);
+      return x;
+    }
+    function buildMonthSegments(minDate, totalDays) {
+      const segments = []; let startIdx = 0; let startMonth = addDays(minDate, 0);
+      for (let i = 0; i < totalDays; i++) {
+        const d = addDays(minDate, i);
+        if (i === 0) { startMonth = d; }
+        const next = addDays(minDate, i + 1);
+        const changed = next.getMonth() !== d.getMonth() || i === totalDays - 1;
+        if (changed) {
+          const endIdx = (i === totalDays - 1) ? i : i;
+          const len = endIdx - startIdx + 1;
+          const label = monthLabel(startMonth);
+          segments.push({ start: startIdx, len, label });
+          startIdx = i + 1; startMonth = next;
+        }
+      }
+      return segments;
+    }
+    function getStatusColor(status) {
+      switch (status) {
+        case 'Not Started': return 'var(--status-not-started)';
+        case 'In Progress': return 'var(--status-in-progress)';
+        case 'On Hold': return 'var(--status-on-hold)';
+        case 'Behind Schedule': return 'var(--status-behind-schedule)';
+        case 'Completed': return 'var(--status-completed)';
+        case 'Blocked': return 'var(--status-blocked)';
+        default: return '#94a3b8';
+      }
+    }
+    const BASE_COLORS_PALETTE = ['#1b3a60', '#304f30', '#5a2b30', '#5a4630', '#305a5a', '#45305a', '#5a3045'];
+    function getBaseColor(id) {
+      let hash = 0; for (let i = 0; i < id.length; i++) { hash = id.charCodeAt(i) + ((hash << 5) - hash); }
+      return BASE_COLORS_PALETTE[Math.abs(hash % BASE_COLORS_PALETTE.length)];
+    }
+    
+    // PDF Download Function
+    async function downloadPdf() {
+        const btn = document.getElementById('btn-download-pdf');
+        if (!window.jspdf || !window.html2canvas) {
+            showCustomAlert("Error", "PDF libraries are still loading. Please try again in a moment.");
+            return;
+        }
+        
+        const originalText = btn.textContent;
+        btn.textContent = 'Generating...';
+        btn.disabled = true;
+
+        const contentToCapture = document.getElementById(currentView === 'planner' ? 'planner-view' : 'dashboard-view');
+        
+        try {
+            const canvas = await html2canvas(contentToCapture, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#091423'
+            });
+
+            const { jsPDF } = window.jspdf;
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`Project-${currentView}.pdf`);
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            showCustomAlert("Error", "Could not generate PDF. Please try again.");
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    }
+
+
+    // =================================================================================
+    // MAIN APPLICATION SCRIPT
+    // Encapsulated in an IIFE to prevent global scope pollution.
+    // =================================================================================
+    (function () {
+      const STORAGE_KEY = 'mgcp_projects_v8'; // Updated key for new features
+      const TEAMS_KEY = 'mgcp_teams_v8';
+
+      // --- State Variables ---
+      let teams = [
+          { id: 'gypsum', name: 'Gypsum Team', color: '#14b8a6' },
+          { id: 'paint', name: 'Paint Team', color: '#22c55e' },
+          { id: 'putty', name: 'Putty Team', color: '#f9a8d4' },
+          { id: 'wiring', name: 'Wiring Team', color: '#a78bfa' },
+          { id: 'ac', name: 'AC Team', color: '#60a5fa' },
+          { id: 'plumbing', name: 'Plumbing Team', color: '#f59e0b' },
+          { id: 'other', name: 'Other', color: '#94a3b8' },
+      ];
+      let projects = [];
+      let currentProjectId;
+      let currentTeamFilter = 'all';
+      let currentStatusFilter = 'all';
+      let currentView = 'planner';
+      const STATUS_OPTIONS = ['Not Started', 'In Progress', 'On Hold', 'Behind Schedule', 'Completed', 'Blocked'];
+      let saveDebounced = debounce(saveAll, 400);
+
+      // --- DOM Element References ---
+      const plannerView = document.getElementById('planner-view');
+      const dashboardView = document.getElementById('dashboard-view');
+      const btnToggleView = document.getElementById('btn-toggle-view');
+      const appTitle = document.getElementById('app-title');
+      const mainDownloadButton = document.getElementById('btn-download-pdf');
+      const projectSelect = document.getElementById('project-select');
+      const btnNewProject = document.getElementById('btn-new-project');
+      const btnArchiveProject = document.getElementById('btn-archive-project');
+      const btnDeleteProject = document.getElementById('btn-delete-project');
+      const areasContainer = document.getElementById('areas-container');
+      const btnAddArea = document.getElementById('btn-add-area');
+      const btnGanttView = document.getElementById('btn-gantt-view');
+      const btnLegendView = document.getElementById('btn-legend-view');
+      const teamLegendList = document.getElementById('team-legend-list');
+      const btnAddTeam = document.getElementById('btn-add-team');
+      const ganttPlanner = document.getElementById('gantt-planner');
+      const filterTeamSelect = document.getElementById('filter-team');
+      const filterStatusSelect = document.getElementById('filter-status');
+
+      // --- Data Persistence ---
+      function loadAll() {
+        try { projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { projects = []; }
+        try { const t = localStorage.getItem(TEAMS_KEY); if (t) teams = JSON.parse(t); } catch {}
+      }
+      function saveAll() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+        localStorage.setItem(TEAMS_KEY, JSON.stringify(teams));
+      }
+
+      // --- View Management ---
+      function showPlannerView() {
+        plannerView.classList.remove('hidden'); dashboardView.classList.add('hidden');
+        btnToggleView.textContent = 'Switch to Dashboard'; appTitle.textContent = 'Modern Gypsum Ceiling Projects';
+        mainDownloadButton.onclick = downloadPdf; currentView = 'planner'; initPlanner();
+      }
+      function showDashboardView() {
+        plannerView.classList.add('hidden'); dashboardView.classList.remove('hidden');
+        btnToggleView.textContent = 'Back to Planner'; appTitle.textContent = 'Team Activity Dashboard';
+        mainDownloadButton.onclick = downloadPdf; currentView = 'dashboard'; initDashboard();
+      }
+
+      // --- Initialization ---
+      document.addEventListener('DOMContentLoaded', () => {
+        loadAll();
+        showPlannerView();
+        btnToggleView.addEventListener('click', () => {
+          if (currentView === 'planner') showDashboardView(); else showPlannerView();
+        });
+        setupEventListeners();
+      });
+
+      function initPlanner() {
+        if (projects.length === 0) {
+          createDefaultProject();
+        }
+        migrateData();
+        
+        const activeProjects = projects.filter(p => !p.archived);
+        if (!currentProjectId || !projects.some(p => p.id === currentProjectId)) {
+          currentProjectId = activeProjects.length > 0 ? activeProjects[0].id : (projects[0] ? projects[0].id : null);
+        }
+        refreshPlannerUI();
+        renderLegend();
+        renderFilterOptions();
+      }
+
+      function createDefaultProject() {
+        const today = new Date();
+        const task1End = addDays(today, 4);
+        projects.push({
+          id: generateUUID(), name: 'Default Project', archived: false, areas: [{
+            id: generateUUID(), name: 'Area A', tasks: [
+              { id: generateUUID(), team: 'gypsum', teamNameCustom: '', startDate: formatDateDMY(today), endDate: formatDateDMY(task1End), duration: 5, notes: 'Initial setup', status: 'Not Started', dependsOn: null },
+              { id: generateUUID(), team: 'paint', teamNameCustom: '', startDate: formatDateDMY(addDays(today, 5)), endDate: formatDateDMY(addDays(today, 7)), duration: 3, notes: 'First coat', status: 'Not Started', dependsOn: null }
+            ]
+          }]
+        });
+        saveAll();
+      }
+      
+      function migrateData() {
+        // Data migration for older tasks without duration
+        projects.forEach(p => p.areas.forEach(a => a.tasks.forEach(t => {
+            if (t.duration === undefined) {
+                const start = parseDateDMY(t.startDate);
+                const end = parseDateDMY(t.endDate);
+                t.duration = (start && end) ? diffDays(start, end) + 1 : 1;
+            }
+        })));
+        saveAll();
+      }
+      
+      // --- Core UI Rendering ---
+      function refreshPlannerUI() {
+        if (!currentProjectId) {
+            areasContainer.innerHTML = '<p class="text-center text-gray-400 p-8">No project selected. Create a new project to begin.</p>';
+            ganttPlanner.innerHTML = '';
+            return;
+        }
+        updateAllTaskStatuses(); // Recalculate dependencies before rendering
+        renderProjectSelect();
+        renderAreas();
+        renderOverallProjectProgress();
+        renderPlannerGantt();
+      }
+
+      function renderProjectSelect() {
+        projectSelect.innerHTML = '';
+        const activeOptGroup = document.createElement('optgroup'); activeOptGroup.label = 'Active Projects';
+        const archivedOptGroup = document.createElement('optgroup'); archivedOptGroup.label = 'Archived Projects';
+        let hasActive = false, hasArchived = false;
+        projects.forEach(p => {
+          const opt = document.createElement('option'); opt.value = p.id; opt.textContent = p.name;
+          if (p.id === currentProjectId) opt.selected = true;
+          if (p.archived) { archivedOptGroup.appendChild(opt); hasArchived = true; }
+          else { activeOptGroup.appendChild(opt); hasActive = true; }
+        });
+        if (hasActive) projectSelect.appendChild(activeOptGroup);
+        if (hasArchived) projectSelect.appendChild(archivedOptGroup);
+        updateArchiveButtonState();
+      }
+
+      function updateArchiveButtonState() {
+        const project = projects.find(p => p.id === currentProjectId);
+        if (project) {
+          btnArchiveProject.textContent = project.archived ? 'Unarchive Project' : 'Archive Project';
+          btnArchiveProject.classList.toggle('bg-gray-500', project.archived);
+          btnArchiveProject.classList.toggle('hover:bg-gray-400', project.archived);
+          btnArchiveProject.classList.toggle('bg-amber-500', !project.archived);
+          btnArchiveProject.classList.toggle('hover:bg-amber-400', !project.archived);
+        }
+      }
+
+      function renderAreas() {
+        areasContainer.innerHTML = '';
+        const project = projects.find(p => p.id === currentProjectId);
+        if (!project || !project.areas || project.areas.length === 0) {
+            areasContainer.innerHTML = '<div class="text-center bg-gray-800 border border-dashed border-gray-600 rounded-xl p-8 text-gray-400">This project has no areas. Click "Add New Area" to start.</div>';
+            return;
+        }
+        project.areas.forEach(area => {
+          const areaDiv = document.createElement('div');
+          areaDiv.className = 'bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-md area';
+          areaDiv.dataset.areaId = area.id;
+          
+          const headerDiv = document.createElement('div');
+          headerDiv.className = 'flex items-center justify-between gap-2 mb-2';
+          const nameInput = document.createElement('input');
+          nameInput.className = 'flex-grow text-lg font-bold bg-transparent border-b-2 border-teal-500 text-gray-100 focus:outline-none focus:border-teal-400 p-1';
+          nameInput.value = area.name;
+          nameInput.placeholder = 'Area name';
+          nameInput.addEventListener('input', () => { area.name = nameInput.value; saveDebounced(); renderPlannerGantt(); });
+          
+          const delBtn = document.createElement('button');
+          delBtn.className = 'px-3 py-1 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 transition ease-in-out duration-150';
+          delBtn.textContent = 'Delete Area';
+          delBtn.onclick = () => showCustomConfirm('Delete Area', `Are you sure you want to delete the area "${area.name}" and all its tasks?`, () => {
+            project.areas = project.areas.filter(a => a.id !== area.id);
+            saveAll();
+            refreshPlannerUI();
+          });
+          
+          headerDiv.appendChild(nameInput);
+          headerDiv.appendChild(delBtn);
+          areaDiv.appendChild(headerDiv);
+          
+          const percentage = calculateWeightedCompletion(area.tasks);
+          const progressContainer = document.createElement('div');
+          progressContainer.className = 'w-full bg-gray-700 rounded-full h-2.5 mb-3';
+          progressContainer.innerHTML = `<div class="bg-teal-500 h-2.5 rounded-full" style="width: ${percentage}%" title="${Math.round(percentage)}% Complete"></div>`;
+          areaDiv.appendChild(progressContainer);
+          
+          const tableContainer = document.createElement('div');
+          tableContainer.className = 'overflow-x-auto';
+          const table = document.createElement('table');
+          table.className = 'min-w-full divide-y divide-gray-700 rounded-lg overflow-hidden';
+          table.innerHTML = `<thead class="bg-gray-700"><tr>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Team</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Start Date</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Duration</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Notes</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Depends On</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+          </tr></thead><tbody class="bg-gray-800 divide-y divide-gray-700"></tbody>`;
+          const tbody = table.querySelector('tbody');
+          area.tasks.forEach(task => tbody.appendChild(buildTaskRow(area, task)));
+          tableContainer.appendChild(table);
+          areaDiv.appendChild(tableContainer);
+          
+          const addTaskBtn = document.createElement('button');
+          addTaskBtn.className = 'mt-3 px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg hover:bg-blue-600';
+          addTaskBtn.textContent = 'Add New Task';
+          addTaskBtn.onclick = () => {
+            const t = { id: generateUUID(), team: 'gypsum', teamNameCustom: '', startDate: formatDateDMY(new Date()), endDate: formatDateDMY(new Date()), duration: 1, notes: '', status: 'Not Started', dependsOn: null };
+            area.tasks.push(t);
+            saveAll();
+            refreshPlannerUI();
+          };
+          areaDiv.appendChild(addTaskBtn);
+          areasContainer.appendChild(areaDiv);
+        });
+      }
+
+      function buildTaskRow(area, task) {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-700 transition-colors duration-150';
+
+        // Team Cell
+        const tdTeam = document.createElement('td');
+        tdTeam.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-200';
+        const teamSelect = document.createElement('select');
+        teamSelect.className = 'block w-full bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-1 text-sm';
+        teams.forEach(tm => {
+          const o = document.createElement('option');
+          o.value = tm.id; o.textContent = tm.name;
+          if (task.team === tm.id) o.selected = true;
+          teamSelect.appendChild(o);
+        });
+        const customTeamInput = document.createElement('input');
+        customTeamInput.type = 'text';
+        customTeamInput.placeholder = 'Custom team name';
+        customTeamInput.className = 'block w-full mt-1 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-1 text-sm';
+        customTeamInput.style.display = (task.team === 'other') ? 'block' : 'none';
+        if (task.teamNameCustom) customTeamInput.value = task.teamNameCustom;
+        teamSelect.onchange = () => {
+          task.team = teamSelect.value;
+          customTeamInput.style.display = (teamSelect.value === 'other') ? 'block' : 'none';
+          if (teamSelect.value !== 'other') task.teamNameCustom = '';
+          saveAll();
+          refreshPlannerUI();
+        };
+        customTeamInput.oninput = () => { task.teamNameCustom = customTeamInput.value; saveDebounced(); refreshPlannerUI(); };
+        tdTeam.appendChild(teamSelect);
+        tdTeam.appendChild(customTeamInput);
+        tr.appendChild(tdTeam);
+
+        // Start Date Cell
+        const tdStart = document.createElement('td');
+        tdStart.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-200';
+        const startDateInput = document.createElement('input');
+        startDateInput.type = 'date';
+        startDateInput.className = 'block w-full bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-1 text-sm';
+        startDateInput.value = toISODate(task.startDate);
+        tdStart.appendChild(startDateInput);
+        tr.appendChild(tdStart);
+
+        // Duration Cell
+        const tdDuration = document.createElement('td');
+        tdDuration.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-200';
+        const durationSelect = document.createElement('select');
+        durationSelect.className = 'block w-full bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-1 text-sm';
+        const durationOptions = [{ value: 0.25, text: 'Quarter Day' }, { value: 0.5, text: 'Half Day' }];
+        for (let i = 1; i <= 30; i++) { durationOptions.push({ value: i, text: `${i} day${i > 1 ? 's' : ''}` }); }
+        durationOptions.forEach(opt => {
+          const o = document.createElement('option');
+          o.value = opt.value; o.textContent = opt.text;
+          if (parseFloat(task.duration) === opt.value) o.selected = true;
+          durationSelect.appendChild(o);
+        });
+        tdDuration.appendChild(durationSelect);
+        tr.appendChild(tdDuration);
+
+        // Date update logic
+        const updateTaskDates = () => {
+          const newStartDateStr = fromISODate(startDateInput.value);
+          const newDuration = parseFloat(durationSelect.value);
+          if (newStartDateStr && !isNaN(newDuration)) {
+            task.startDate = newStartDateStr;
+            task.duration = newDuration;
+            const dayOffset = Math.ceil(newDuration) - 1;
+            const newEndDate = addDays(parseDateDMY(newStartDateStr), dayOffset);
+            task.endDate = formatDateDMY(newEndDate);
+            saveAll();
+            refreshPlannerUI();
+          }
+        };
+        startDateInput.onchange = updateTaskDates;
+        durationSelect.onchange = updateTaskDates;
+
+        // Notes Cell
+        const tdNotes = document.createElement('td');
+        tdNotes.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-200';
+        const notesInput = document.createElement('input');
+        notesInput.type = 'text';
+        notesInput.className = 'block w-full bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-1 text-sm';
+        notesInput.value = task.notes || '';
+        notesInput.placeholder = 'Optional notes';
+        notesInput.oninput = () => { task.notes = notesInput.value; saveDebounced(); };
+        tdNotes.appendChild(notesInput);
+        tr.appendChild(tdNotes);
+
+        // Depends On Cell
+        const tdDep = document.createElement('td');
+        tdDep.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-200';
+        const depSelect = document.createElement('select');
+        depSelect.className = 'block w-full bg-gray-700 border border-gray-600 text-gray-100 rounded-lg p-1 text-sm';
+        depSelect.innerHTML = '<option value="">None</option>';
+        const allTasks = projects.find(p => p.id === currentProjectId)?.areas.flatMap(a => a.tasks) || [];
+        allTasks.forEach(t => {
+          if (t.id === task.id) return; // Can't depend on itself
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.notes || `Task from ${t.startDate}`;
+          if (task.dependsOn === t.id) opt.selected = true;
+          depSelect.appendChild(opt);
+        });
+        depSelect.onchange = () => { task.dependsOn = depSelect.value || null; saveAll(); refreshPlannerUI(); };
+        tdDep.appendChild(depSelect);
+        tr.appendChild(tdDep);
+
+        // Status Cell
+        const tdStatus = document.createElement('td');
+        tdStatus.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-200';
+        const statusSelect = document.createElement('select');
+        statusSelect.className = 'block w-full border border-gray-600 text-gray-100 rounded-lg p-1 text-sm';
+        STATUS_OPTIONS.forEach(status => {
+          const opt = document.createElement('option');
+          opt.value = status; opt.textContent = status;
+          if (task.status === status) opt.selected = true;
+          statusSelect.appendChild(opt);
+        });
+        statusSelect.onchange = () => { task.status = statusSelect.value; statusSelect.style.backgroundColor = getStatusColor(statusSelect.value); saveAll(); refreshPlannerUI(); };
+        statusSelect.style.backgroundColor = getStatusColor(task.status);
+        if (task.status === 'Blocked') { statusSelect.disabled = true; }
+        tdStatus.appendChild(statusSelect);
+        tr.appendChild(tdStatus);
+
+        // Actions Cell
+        const tdActions = document.createElement('td');
+        tdActions.className = 'px-4 py-2 whitespace-nowrap text-right text-sm font-medium';
+        const delBtn = document.createElement('button');
+        delBtn.className = 'px-3 py-1 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500';
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = () => showCustomConfirm('Delete Task', 'Are you sure?', () => {
+          area.tasks = area.tasks.filter(t => t.id !== task.id);
+          saveAll();
+          refreshPlannerUI();
+        });
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+
+        return tr;
+      }
+      
+      function renderOverallProjectProgress() {
+          const container = document.getElementById('overall-progress-container');
+          container.innerHTML = '';
+          const project = projects.find(p => p.id === currentProjectId);
+          if (!project) return;
+          const allTasks = project.areas.flatMap(area => area.tasks);
+          const percentage = calculateWeightedCompletion(allTasks);
+          container.innerHTML = `<h3 class="text-sm font-bold text-gray-200 mb-1">Overall Project Progress</h3>
+            <div class="w-full bg-gray-900 rounded-full h-6 border border-gray-700">
+              <div class="bg-gradient-to-r from-teal-500 to-blue-500 h-full rounded-full text-sm font-bold text-white text-center leading-6 transition-all duration-500" style="width: ${percentage}%">${Math.round(percentage)}%</div>
+            </div>`;
+      }
+
+      function renderLegend() {
+        teamLegendList.innerHTML = '';
+        teams.forEach(tm => {
+          const li = document.createElement('li');
+          li.className = 'flex items-center gap-2 bg-gray-700 p-2 rounded-lg';
+          const colorInput = document.createElement('input');
+          colorInput.type = 'color';
+          colorInput.className = 'w-8 h-8 rounded-md border-none';
+          colorInput.value = tm.color;
+          colorInput.oninput = () => { tm.color = colorInput.value; saveAll(); renderPlannerGantt(); };
+          const nameInput = document.createElement('input');
+          nameInput.type = 'text';
+          nameInput.className = 'flex-grow bg-gray-600 border border-gray-500 text-gray-100 rounded-lg p-1 text-sm';
+          nameInput.value = tm.name;
+          nameInput.oninput = () => { tm.name = nameInput.value; saveDebounced(); };
+          const delBtn = document.createElement('button');
+          delBtn.className = 'px-3 py-1 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed';
+          delBtn.textContent = 'Delete';
+          delBtn.disabled = ['gypsum', 'paint', 'putty', 'other'].includes(tm.id);
+          delBtn.title = delBtn.disabled ? 'Default team cannot be deleted' : 'Delete team';
+          delBtn.onclick = () => showCustomConfirm('Delete Team', 'Are you sure?', () => {
+            teams = teams.filter(t => t.id !== tm.id);
+            projects.forEach(p => p.areas.forEach(a => a.tasks.forEach(t => { if (t.team === tm.id) t.team = 'other'; })));
+            saveAll();
+            renderLegend();
+            refreshPlannerUI();
+          });
+          li.appendChild(colorInput);
+          li.appendChild(nameInput);
+          li.appendChild(delBtn);
+          teamLegendList.appendChild(li);
+        });
+      }
+
+      function renderFilterOptions() {
+        filterTeamSelect.innerHTML = '<option value="all">All Teams</option>';
+        const uniqueTeams = new Set();
+        projects.forEach(p => p.areas.forEach(a => a.tasks.forEach(t => {
+          const key = (t.team === 'other' && t.teamNameCustom) ? 'other:' + t.teamNameCustom.toLowerCase() : t.team;
+          uniqueTeams.add(key);
+        })));
+        uniqueTeams.forEach(key => {
+          const opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = getTeamNameFromKey(key);
+          if (currentTeamFilter === key) opt.selected = true;
+          filterTeamSelect.appendChild(opt);
+        });
+        filterStatusSelect.innerHTML = '<option value="all">All Statuses</option>';
+        STATUS_OPTIONS.forEach(status => {
+          const opt = document.createElement('option');
+          opt.value = status;
+          opt.textContent = status;
+          if (currentStatusFilter === status) opt.selected = true;
+          filterStatusSelect.appendChild(opt);
+        });
+      }
+
+      // --- Gantt Chart Logic ---
+      function renderPlannerGantt() {
+        ganttPlanner.innerHTML = '<h2 class="text-md font-semibold text-gray-100 mb-2">Project Timeline (by Team)</h2>';
+        const project = projects.find(p => p.id === currentProjectId);
+        if (!project) { ganttPlanner.innerHTML += '<p class="text-gray-400">No project selected.</p>'; return; }
+        
+        let allTasks = project.areas.flatMap(a => a.tasks.map(t => ({ ...t, areaName: a.name, areaId: a.id, projectName: project.name })));
+        if (currentTeamFilter !== 'all') allTasks = allTasks.filter(t => ((t.team === 'other' && t.teamNameCustom) ? 'other:' + t.teamNameCustom.toLowerCase() : t.team) === currentTeamFilter);
+        if (currentStatusFilter !== 'all') allTasks = allTasks.filter(t => t.status === currentStatusFilter);
+        
+        if (allTasks.length === 0) { ganttPlanner.innerHTML += '<div class="text-center border border-dashed border-gray-600 rounded-xl p-8 text-gray-400">No tasks match the current filters.</div>'; return; }
+        
+        const starts = allTasks.map(t => parseDateDMY(t.startDate)).filter(Boolean);
+        const ends = allTasks.map(t => parseDateDMY(t.endDate)).filter(Boolean);
+        if (starts.length === 0 || ends.length === 0) { ganttPlanner.innerHTML += '<p class="text-gray-400">Tasks have invalid dates.</p>'; return; }
+        
+        const minDate = new Date(Math.min(...starts));
+        const maxDate = new Date(Math.max(...ends));
+        const totalDays = diffDays(minDate, maxDate) + 1;
+        
+        const viewport = document.createElement('div');
+        viewport.className = 'gantt-viewport';
+        
+        const monthsRow = document.createElement('div');
+        monthsRow.className = 'gantt-months gantt-grid';
+        monthsRow.style.setProperty('--total-days', totalDays);
+        monthsRow.innerHTML = `<div class="label-cell bg-blue-900 border-b border-blue-800 text-gray-100">Team / Area</div>`;
+        buildMonthSegments(minDate, totalDays).forEach(seg => { monthsRow.innerHTML += `<div class="month-cell" style="grid-column: ${2 + seg.start} / span ${seg.len}">${seg.label}</div>`; });
+        
+        const daysRow = document.createElement('div');
+        daysRow.className = 'gantt-days gantt-grid';
+        daysRow.style.setProperty('--total-days', totalDays);
+        daysRow.innerHTML = `<div class="label-cell bg-blue-800 border-b border-blue-700 text-gray-200"></div>`;
+        for (let i = 0; i < totalDays; i++) { daysRow.innerHTML += `<div class="day-cell" style="grid-column: ${2+i} / span 1">${addDays(minDate, i).getDate()}</div>`; }
+        
+        viewport.appendChild(monthsRow);
+        viewport.appendChild(daysRow);
+        
+        const rowContainer = document.createElement('div');
+        const byTeamAndArea = groupTasksByTeamAndArea(allTasks);
+        
+        byTeamAndArea.forEach((areasMap, teamKey) => {
+          const teamHeaderRow = document.createElement('div');
+          teamHeaderRow.className = 'gantt-team-header gantt-grid';
+          teamHeaderRow.style.setProperty('--total-days', totalDays);
+          teamHeaderRow.innerHTML = `<div class="label-cell gantt-team-label-cell">${getTeamNameFromKey(teamKey)}</div><div style="grid-column: 2 / -1;"></div>`;
+          rowContainer.appendChild(teamHeaderRow);
+          
+          areasMap.forEach((areaTasks, areaName) => {
+            const areaRow = document.createElement('div');
+            areaRow.className = 'gantt-row';
+            areaRow.style.setProperty('--total-days', totalDays);
+            areaRow.innerHTML = `<div class="label-cell gantt-area-label" style="background-color: ${getBaseColor(teamKey)}">${areaName}</div>`;
+            
+            const areaCanvas = document.createElement('div');
+            areaCanvas.className = 'task-bar-container';
+            areaCanvas.style.backgroundColor = `color-mix(in srgb, ${getBaseColor(teamKey)} 85%, black)`;
+            
+            areaTasks.sort((a, b) => parseDateDMY(a.startDate) - parseDateDMY(b.startDate));
+            areaTasks.forEach(t => {
+              const s = parseDateDMY(t.startDate);
+              if (!s) return;
+              const left = diffDays(minDate, s);
+              const taskBarEl = document.createElement('div');
+              taskBarEl.className = 'task-bar';
+              taskBarEl.dataset.taskId = t.id;
+              taskBarEl.style.left = `calc(${left} * var(--day-width))`;
+              taskBarEl.style.width = `calc(${t.duration} * var(--day-width) - 4px)`;
+              
+              let barColor = getStatusColor(t.status);
+              const today = new Date(); today.setHours(0,0,0,0);
+              if (s < today && t.status === 'Not Started' && !t.dependsOn) { barColor = 'var(--status-urgent-past-start)'; }
+              taskBarEl.style.backgroundColor = barColor;
+              taskBarEl.textContent = getBarLabel(t.notes || 'No Notes', t.duration);
+              
+              taskBarEl.ondblclick = () => showTaskDetailsModal(t);
+              
+              // Add resize handles
+              taskBarEl.innerHTML += '<div class="resize-handle left"></div><div class="resize-handle right"></div>';
+
+              areaCanvas.appendChild(taskBarEl);
+            });
+            areaRow.appendChild(areaCanvas);
+            rowContainer.appendChild(areaRow);
+          });
+        });
+
+        viewport.appendChild(rowContainer);
+        ganttPlanner.appendChild(viewport);
+        
+        addTodayMarker(viewport, minDate);
+        setupGanttDragAndDrop(viewport, minDate);
+        
+        setTimeout(() => drawDependencyArrows(allTasks, minDate), 0);
+      }
+      
+      function groupTasksByTeamAndArea(tasks) {
+          const byTeamAndArea = new Map();
+          tasks.forEach(t => {
+            const teamKey = (t.team === 'other' && t.teamNameCustom) ? 'other:' + t.teamNameCustom.toLowerCase() : t.team;
+            if (!byTeamAndArea.has(teamKey)) byTeamAndArea.set(teamKey, new Map());
+            const areaMap = byTeamAndArea.get(teamKey);
+            if (!areaMap.has(t.areaName)) areaMap.set(t.areaName, []);
+            areaMap.get(t.areaName).push(t);
+          });
+          return byTeamAndArea;
+      }
+
+      function addTodayMarker(viewport, minDate) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (today >= minDate) {
+              const dayOffset = diffDays(minDate, today);
+              const marker = document.createElement('div');
+              marker.className = 'today-marker';
+              marker.style.left = `calc(var(--label-width) + ${dayOffset} * var(--day-width))`;
+              viewport.appendChild(marker);
+          }
+      }
+
+      function drawDependencyArrows(tasks, minDate) {
+          const ganttContainer = ganttPlanner.querySelector('.gantt-viewport');
+          let svg = ganttContainer.querySelector('#dependency-lines-svg');
+          if (svg) svg.remove();
+
+          const allProjectTasks = projects.find(p => p.id === currentProjectId)?.areas.flatMap(a => a.tasks) || [];
+          const taskMap = new Map(allProjectTasks.map(t => [t.id, t]));
+          
+          svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.id = 'dependency-lines-svg';
+          
+          const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          defs.innerHTML = `<marker id="arrowhead" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b"></path></marker>`;
+          svg.appendChild(defs);
+
+          tasks.forEach(task => {
+              if (task.dependsOn) {
+                  const prerequisite = taskMap.get(task.dependsOn);
+                  if (!prerequisite) return;
+
+                  const fromBar = ganttContainer.querySelector(`.task-bar[data-task-id="${prerequisite.id}"]`);
+                  const toBar = ganttContainer.querySelector(`.task-bar[data-task-id="${task.id}"]`);
+                  
+                  if (!fromBar || !toBar) return;
+
+                  const x1 = fromBar.offsetLeft + fromBar.offsetWidth;
+                  const y1 = fromBar.offsetTop + fromBar.offsetHeight / 2;
+                  const x2 = toBar.offsetLeft;
+                  const y2 = toBar.offsetTop + toBar.offsetHeight / 2;
+                  
+                  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                  path.setAttribute('class', 'dependency-arrow');
+                  
+                  const offset = 15;
+                  let d = `M ${x1} ${y1} H ${x1 + offset} V ${y2} H ${x2}`;
+                  
+                  path.setAttribute('d', d);
+                  svg.appendChild(path);
+              }
+          });
+          ganttContainer.prepend(svg);
+      }
+
+      // --- Task Drag & Drop / Resize Logic ---
+      function setupGanttDragAndDrop(viewport, minDate) {
+        let draggedElement = null;
+        let startX, originalLeft, originalWidth;
+        let isResizing = null; // 'left' or 'right'
+
+        viewport.addEventListener('mousedown', (e) => {
+            const target = e.target;
+            
+            if (target.classList.contains('resize-handle')) {
+                isResizing = target.classList.contains('left') ? 'left' : 'right';
+                draggedElement = target.parentElement;
+            } else if (target.classList.contains('task-bar')) {
+                isResizing = null;
+                draggedElement = target;
+            } else {
+                return;
+            }
+
+            e.preventDefault();
+            draggedElement.classList.add('dragging');
+            startX = e.clientX;
+            originalLeft = draggedElement.offsetLeft;
+            originalWidth = draggedElement.offsetWidth;
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        function onMouseMove(e) {
+            if (!draggedElement) return;
+            const dx = e.clientX - startX;
+            const dayWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-width'));
+            const dayDelta = Math.round(dx / dayWidth);
+
+            if (isResizing) {
+                const project = projects.find(p => p.id === currentProjectId);
+                const task = findTaskById(project, draggedElement.dataset.taskId);
+                if(!task) return;
+                
+                if (isResizing === 'right') {
+                    const newDuration = Math.max(0.25, parseFloat(task.duration) + dayDelta);
+                    if(newDuration !== task.duration) {
+                        task.duration = newDuration;
+                        updateTaskDatesFromUI(task);
+                        startX = e.clientX; // reset startX to avoid cumulative changes
+                    }
+                } else { // Resizing left
+                    const newDuration = Math.max(0.25, parseFloat(task.duration) - dayDelta);
+                    if(newDuration !== task.duration) {
+                        const originalStartDate = parseDateDMY(task.startDate);
+                        task.startDate = formatDateDMY(addDays(originalStartDate, dayDelta));
+                        task.duration = newDuration;
+                        updateTaskDatesFromUI(task);
+                        startX = e.clientX;
+                    }
+                }
+            } else { // Moving
+                draggedElement.style.left = `${originalLeft + dx}px`;
+            }
+        }
+
+        function onMouseUp(e) {
+            if (!draggedElement) return;
+            draggedElement.classList.remove('dragging');
+            
+            const dx = e.clientX - startX;
+            const dayWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-width'));
+            const dayDelta = Math.round(dx / dayWidth);
+            
+            const project = projects.find(p => p.id === currentProjectId);
+            const task = findTaskById(project, draggedElement.dataset.taskId);
+
+            if (task && !isResizing && dayDelta !== 0) {
+                const originalStartDate = parseDateDMY(task.startDate);
+                task.startDate = formatDateDMY(addDays(originalStartDate, dayDelta));
+                updateTaskDatesFromUI(task);
+            }
+            
+            draggedElement = null;
+            isResizing = null;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            
+            // Full re-render to snap back and update dependencies
+            refreshPlannerUI();
+        }
+      }
+
+      function findTaskById(project, taskId) {
+        for (const area of project.areas) {
+            const task = area.tasks.find(t => t.id === taskId);
+            if (task) return task;
+        }
+        return null;
+      }
+
+      function updateTaskDatesFromUI(task) {
+        const start = parseDateDMY(task.startDate);
+        if (start) {
+            const dayOffset = Math.ceil(task.duration) - 1;
+            task.endDate = formatDateDMY(addDays(start, dayOffset));
+            saveAll();
+        }
+      }
+      
+      // --- Business Logic ---
+      function calculateWeightedCompletion(tasks) {
+          let totalDuration = 0, completedDuration = 0;
+          tasks.forEach(task => {
+              const duration = parseFloat(task.duration) || 0;
+              totalDuration += duration;
+              if (task.status === 'Completed') completedDuration += duration;
+          });
+          return totalDuration === 0 ? 0 : (completedDuration / totalDuration) * 100;
+      }
+
+      function getBarLabel(content, duration) {
+        const contentStr = content || '';
+        const charLimit = Math.floor(duration * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-width')) / 9);
+        if (contentStr.length > charLimit && contentStr.length > 3) {
+          return contentStr.split(/\s+/).filter(Boolean).map(w => w[0]).join('').toUpperCase();
+        }
+        return contentStr || '...';
+      }
+      
+      function updateAllTaskStatuses() {
+          const project = projects.find(p => p.id === currentProjectId);
+          if (!project) return;
+          const allTasks = project.areas.flatMap(a => a.tasks);
+          const taskMap = new Map(allTasks.map(t => [t.id, t]));
+          let changed = false;
+
+          allTasks.forEach(task => {
+              // Dependency check
+              if (task.dependsOn) {
+                  const prerequisite = taskMap.get(task.dependsOn);
+                  if (prerequisite && prerequisite.status !== 'Completed') {
+                      if (task.status !== 'Blocked') {
+                          task.status = 'Blocked';
+                          changed = true;
+                      }
+                  } else if (task.status === 'Blocked') {
+                      task.status = 'Not Started';
+                      changed = true;
+                      // Automatic date shifting
+                      if(prerequisite) {
+                          const prereqEndDate = parseDateDMY(prerequisite.endDate);
+                          if(prereqEndDate) {
+                              task.startDate = formatDateDMY(addDays(prereqEndDate, 1));
+                              const dayOffset = Math.ceil(task.duration) - 1;
+                              task.endDate = formatDateDMY(addDays(parseDateDMY(task.startDate), dayOffset));
+                          }
+                      }
+                  }
+              }
+
+              // Behind schedule check
+              const today = new Date(); today.setHours(0,0,0,0);
+              const endDate = parseDateDMY(task.endDate);
+              if (endDate && endDate < today && task.status !== 'Completed' && task.status !== 'Behind Schedule') {
+                  task.status = 'Behind Schedule';
+                  changed = true;
+              }
+          });
+
+          if (changed) saveAll();
+      }
+
+      function getTeamNameFromKey(key) {
+        if (key.startsWith('other:')) return key.replace('other:', '').split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+        return teams.find(x => x.id === key)?.name || key;
+      }
+
+      // --- Event Listeners Setup ---
+      function setupEventListeners() {
+        btnNewProject.onclick = () => showCustomPrompt('New Project', 'Enter project name:', (name) => { if (!name) return; const p = { id: generateUUID(), name: name.trim(), archived: false, areas: [] }; projects.push(p); currentProjectId = p.id; saveAll(); refreshPlannerUI(); });
+        btnArchiveProject.onclick = () => { const p = projects.find(x => x.id === currentProjectId); if (!p) return; const action = p.archived ? 'unarchive' : 'archive'; showCustomConfirm(`Confirm ${action}`, `Are you sure?`, () => { p.archived = !p.archived; saveAll(); refreshPlannerUI(); }); };
+        btnDeleteProject.onclick = () => { if (!currentProjectId) return; showCustomConfirm('Delete Project', 'Permanently delete this project and all its data?', () => { projects = projects.filter(p => p.id !== currentProjectId); if (projects.length === 0) createDefaultProject(); currentProjectId = (projects.filter(p => !p.archived)[0] || projects[0]).id; saveAll(); refreshPlannerUI(); }); };
+        projectSelect.onchange = (e) => { currentProjectId = e.target.value; refreshPlannerUI(); };
+        btnAddArea.onclick = () => { const p = projects.find(x => x.id === currentProjectId); if (!p) return; showCustomPrompt('New Area', 'Enter area name:', (name) => { if (!name) return; p.areas.push({ id: generateUUID(), name: name.trim(), tasks: [] }); saveAll(); refreshPlannerUI(); }); };
+        btnGanttView.onclick = () => { document.getElementById('legend-container').classList.add('hidden'); btnLegendView.classList.remove('bg-teal-600', 'text-white'); btnLegendView.classList.add('bg-gray-700', 'text-gray-200'); btnGanttView.classList.add('bg-teal-600', 'text-white'); btnGanttView.classList.remove('bg-gray-700', 'text-gray-200'); areasContainer.classList.remove('hidden'); btnAddArea.classList.remove('hidden'); ganttPlanner.classList.remove('hidden'); };
+        btnLegendView.onclick = () => { document.getElementById('legend-container').classList.remove('hidden'); btnGanttView.classList.remove('bg-teal-600', 'text-white'); btnGanttView.classList.add('bg-gray-700', 'text-gray-200'); btnLegendView.classList.add('bg-teal-600', 'text-white'); btnLegendView.classList.remove('bg-gray-700', 'text-gray-200'); areasContainer.classList.add('hidden'); btnAddArea.classList.add('hidden'); ganttPlanner.classList.add('hidden'); };
+        btnAddTeam.onclick = () => showCustomPrompt('New Team', 'Enter team name:', (nm) => { if (!nm) return; const id = nm.toLowerCase().replace(/\s+/g, '-'); if (teams.some(t => t.id === id)) { showCustomAlert('Error', 'A team with that name already exists.'); return; } teams.push({ id, name: nm.trim(), color: '#' + Math.floor(Math.random() * 16777215).toString(16) }); saveAll(); renderLegend(); refreshPlannerUI(); renderFilterOptions(); });
+        filterTeamSelect.onchange = (e) => { currentTeamFilter = e.target.value; renderPlannerGantt(); };
+        filterStatusSelect.onchange = (e) => { currentStatusFilter = e.target.value; renderPlannerGantt(); };
+        document.getElementById('btn-clear-filters').onclick = () => { currentTeamFilter = 'all'; currentStatusFilter = 'all'; filterTeamSelect.value = 'all'; filterStatusSelect.value = 'all'; renderPlannerGantt(); };
+      }
+
+      // ===== Dashboard Logic =====
+      function initDashboard() {
+        const dashboardContainer = document.getElementById('dashboard-container');
+        dashboardContainer.innerHTML = '';
+        const teamGroups = new Map();
+        const activeProjects = projects.filter(p => !p.archived);
+        
+        activeProjects.forEach(p => {
+          p.areas?.forEach(a => {
+            a.tasks?.forEach(t => {
+              let visibleName = (t.team === 'other' && t.teamNameCustom) ? t.teamNameCustom : (teams.find(tm => tm.id === t.team)?.name || t.team);
+              if (!visibleName) return;
+              const rec = { ...t, areaName: a.name, areaId: a.id, projectName: p.name, projectId: p.id, visibleName };
+              const teamKey = (t.team === 'other' && t.teamNameCustom) ? 'other:' + t.teamNameCustom.toLowerCase() : t.team;
+              if (!teamGroups.has(teamKey)) teamGroups.set(teamKey, { name: visibleName, tasks: [] });
+              teamGroups.get(teamKey).tasks.push(rec);
+            });
+          });
+        });
+
+        if (teamGroups.size === 0) {
+          dashboardContainer.innerHTML = '<p class="text-gray-300 text-center text-lg mt-8">No tasks found in active projects.</p>';
+          return;
+        }
+
+        teamGroups.forEach((teamData) => {
+          const tasks = teamData.tasks;
+          const dates = tasks.flatMap(t => [parseDateDMY(t.startDate), parseDateDMY(t.endDate)]).filter(Boolean);
+          if (dates.length === 0) return;
+          const min = new Date(Math.min(...dates)); const max = new Date(Math.max(...dates));
+          const totalDays = diffDays(min, max) + 1;
+          if (!isFinite(totalDays) || totalDays <= 0) return;
+
+          const section = document.createElement('section');
+          section.className = 'bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg team-calendar';
+          section.innerHTML = `<h2 class="text-xl font-bold text-gray-100 mb-4">${teamData.name} Activity</h2>`;
+          const viewport = document.createElement('div');
+          viewport.className = 'timeline-viewport';
+          
+          const byProjectAndArea = new Map();
+          tasks.forEach(t => {
+            if (!byProjectAndArea.has(t.projectId)) byProjectAndArea.set(t.projectId, new Map());
+            const areaMap = byProjectAndArea.get(t.projectId);
+            if (!areaMap.has(t.areaName)) areaMap.set(t.areaName, []);
+            areaMap.get(t.areaName).push(t);
+          });
+          
+          const rowsFrag = document.createDocumentFragment();
+          byProjectAndArea.forEach((areasMap, projectId) => {
+            const projectHeaderRow = document.createElement('div');
+            projectHeaderRow.className = 'timeline-project-header timeline-grid';
+            projectHeaderRow.style.setProperty('--total-days', totalDays);
+            
+            const fullProject = projects.find(p => p.id === projectId);
+            const allProjectTasks = fullProject ? fullProject.areas.flatMap(a => a.tasks) : [];
+            const percentage = calculateWeightedCompletion(allProjectTasks);
+            
+            const pieChartHTML = `
+                <div class="pie-chart-container" title="Project Completion: ${Math.round(percentage)}%">
+                    <div class="pie-chart" style="--p:${percentage};"></div>
+                    <span class="pie-chart-label">${Math.round(percentage)}%</span>
+                </div>`;
+            
+            projectHeaderRow.innerHTML = `<div class="label-cell timeline-team-label-cell flex items-center justify-between"><span>${areasMap.values().next().value[0].projectName}</span></div>`;
+            projectHeaderRow.querySelector('.label-cell').insertAdjacentHTML('beforeend', pieChartHTML);
+
+            rowsFrag.appendChild(projectHeaderRow);
+            
+            areasMap.forEach((areaTasks, areaName) => {
+              const row = document.createElement('div');
+              row.className = 'timeline-row';
+              row.style.setProperty('--total-days', totalDays);
+              row.innerHTML = `<div class="label-cell timeline-area-label" style="background-color:${getBaseColor(areaTasks[0].team)}">${areaName}</div>`;
+              const canvas = document.createElement('div');
+              canvas.className = 'task-bar-container';
+              canvas.style.backgroundColor = `color-mix(in srgb, ${getBaseColor(areaTasks[0].team)} 85%, black)`;
+              areaTasks.sort((a,b) => parseDateDMY(a.startDate) - parseDateDMY(b.startDate)).forEach(t => {
+                const s = parseDateDMY(t.startDate), e = parseDateDMY(t.endDate);
+                if (!s || !e) return;
+                const left = diffDays(min, s);
+                const bar = document.createElement('div');
+                bar.className = 'task-bar';
+                bar.style.left = `calc(${left} * var(--day-width))`;
+                bar.style.width = `calc(${t.duration} * var(--day-width) - 4px)`;
+                let barColor = getStatusColor(t.status);
+                const today = new Date(); today.setHours(0,0,0,0);
+                if (s < today && !['In Progress', 'Completed'].includes(t.status)) {
+                    barColor = 'var(--status-urgent-past-start)';
+                }
+                bar.style.backgroundColor = barColor;
+                bar.textContent = getBarLabel(t.notes, t.duration);
+                bar.style.cursor = 'pointer';
+                bar.onclick = () => showTaskDetailsModal(t);
+                canvas.appendChild(bar);
+              });
+              row.appendChild(canvas);
+              rowsFrag.appendChild(row);
+            });
+          });
+          
+          const monthsHeader = `<div class="label-cell bg-blue-900 border-b border-blue-800 text-gray-100">Project / Area</div>` + buildMonthSegments(min, totalDays).map(s => `<div class="month-cell" style="grid-column: ${2+s.start} / span ${s.len}">${s.label}</div>`).join('');
+          const daysHeader = `<div class="label-cell bg-blue-800 border-b border-blue-700"></div>` + Array.from({length: totalDays}, (_, i) => `<div class="day-cell" style="grid-column: ${2+i} / span 1">${addDays(min,i).getDate()}</div>`).join('');
+          
+          viewport.innerHTML = `
+            <div class="timeline-months timeline-grid" style="--total-days: ${totalDays}">${monthsHeader}</div>
+            <div class="timeline-days timeline-grid" style="--total-days: ${totalDays}">${daysHeader}</div>
+          `;
+          viewport.appendChild(rowsFrag);
+          addTodayMarker(viewport, min);
+          section.appendChild(viewport);
+          dashboardContainer.appendChild(section);
+        });
+      }
+      
+      function showTaskDetailsModal(task) {
+        const teamName = (task.team === 'other' && task.teamNameCustom) ? task.teamNameCustom : (teams.find(tm => tm.id === task.team)?.name || task.team);
+        const statusColor = getStatusColor(task.status);
+        let dependencyInfo = '';
+        if (task.status === 'Blocked' && task.dependsOn) {
+            const allTasks = projects.find(p => p.id === currentProjectId)?.areas.flatMap(a => a.tasks) || [];
+            const prereq = allTasks.find(t => t.id === task.dependsOn);
+            if (prereq) {
+                dependencyInfo = `<p><strong>Waiting For:</strong> <span class="text-amber-400">${prereq.notes || `Task from ${prereq.startDate}`}</span></p>`;
+            }
+        }
+        const modalContent = `<div class="space-y-3 text-sm text-left text-gray-300">
+              <p><strong>Area:</strong> <span class="text-gray-100">${task.areaName}</span></p>
+              <p><strong>Team:</strong> <span class="text-gray-100">${teamName}</span></p>
+              <p><strong>Dates:</strong> <span class="text-gray-100">${task.startDate} to ${task.endDate}</span></p>
+              <p><strong>Duration:</strong> <span class="text-gray-100">${task.duration} day(s)</span></p>
+              <p><strong>Status:</strong> <span style="background-color:${statusColor};" class="px-2 py-1 rounded text-xs font-bold text-white">${task.status}</span></p>
+              ${dependencyInfo}
+              <div><strong class="block mb-1">Notes:</strong><p class="mt-1 p-2 bg-gray-900 rounded-md whitespace-pre-wrap text-gray-200">${task.notes || 'No notes.'}</p></div>
+            </div>`;
+        createModal('Task Details', modalContent, 'alert', () => {});
+      }
+
+
+      // --- Custom Modals ---
+      function createModal(title, message, type, callback) {
+        const modalId = 'custom-modal-' + generateUUID();
+        const modalHtml = `<div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 transition-opacity duration-300" style="opacity:0;">
+                <div class="bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm border border-gray-700 transform transition-transform duration-300 scale-95">
+                    <h3 class="text-xl font-bold text-gray-100 mb-4">${title}</h3>
+                    <div class="text-gray-300 mb-6 max-h-[60vh] overflow-y-auto">${message}</div>
+                    <div class="flex justify-end gap-3">
+                        ${type !== 'alert' ? `<button id="cancel-btn-${modalId}" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500">Cancel</button>` : ''}
+                        ${type === 'prompt' ? `<input id="prompt-input-${modalId}" type="text" class="flex-grow bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" />` : ''}
+                        <button id="ok-btn-${modalId}" class="px-4 py-2 bg-teal-500 text-gray-900 font-bold rounded-lg hover:bg-teal-400">OK</button>
+                    </div></div></div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modal = document.getElementById(modalId);
+        const modalDialog = modal.querySelector(':scope > div');
+
+        // Trigger animations
+        requestAnimationFrame(() => {
+            modal.style.opacity = '1';
+            modalDialog.style.transform = 'scale(1)';
+        });
+
+        const removeModal = () => {
+          modal.style.opacity = '0';
+          modalDialog.style.transform = 'scale(0.95)';
+          setTimeout(() => modal.remove(), 300);
+        };
+
+        document.getElementById(`ok-btn-${modalId}`).onclick = () => {
+          if (type === 'prompt') callback(document.getElementById(`prompt-input-${modalId}`).value);
+          else callback(true);
+          removeModal();
+        };
+        if (type !== 'alert') {
+          document.getElementById(`cancel-btn-${modalId}`).onclick = () => {
+            callback(type === 'prompt' ? null : false);
+            removeModal();
+          };
+        }
+        if (type === 'prompt') document.getElementById(`prompt-input-${modalId}`).focus();
+      }
+      function showCustomAlert(title, message) { createModal(title, message, 'alert', () => {}); }
+      function showCustomConfirm(title, message, onConfirm) { createModal(title, message, 'confirm', (result) => { if (result) onConfirm(); }); }
+      function showCustomPrompt(title, message, onInput) { createModal(title, message, 'prompt', (input) => { onInput(input); }); }
+    })();
+  </script>
+</body>
+</html>
