@@ -40,6 +40,10 @@
       --initial-days: 25; /* desktop default */
     }
 
+    html, body {
+        height: 100%;
+    }
+
     body {
       font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, sans-serif;
       background: radial-gradient(1200px 800px at 20% -10%, #0f2746 0%, var(--bg) 55%),
@@ -48,6 +52,7 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden; /* Prevent horizontal scroll on the page itself */
     }
 
     /* Custom scrollbar */
@@ -213,7 +218,7 @@
     }
   </style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 to-blue-950 min-h-screen flex flex-col">
+<body>
   <header class="bg-gradient-to-b from-blue-900 to-blue-950 text-white p-4 flex items-center justify-between shadow-xl border-b border-blue-800">
     <h1 id="app-title" class="text-xl md:text-2xl font-bold tracking-wide">Modern Gypsum Ceiling Projects</h1>
     <nav class="flex gap-2 sm:gap-4 items-center flex-wrap">
@@ -222,8 +227,8 @@
     </nav>
   </header>
 
-  <main class="container mx-auto mt-4 flex-grow p-2">
-    <section id="planner-view" class="space-y-4">
+  <main class="w-full max-w-7xl mx-auto mt-4 flex-1 p-2 flex flex-col">
+    <section id="planner-view" class="space-y-4 flex flex-col flex-1">
        <section id="project-management" class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-center">
         <div class="flex items-center gap-2 md:col-span-2 lg:col-span-2">
           <label for="project-select" class="font-bold text-gray-200 flex-shrink-0">Select Project:</label>
@@ -256,7 +261,7 @@
         <button id="btn-add-team" class="mt-4 px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition ease-in-out duration-150">Add New Team</button>
       </section>
 
-      <section id="gantt-planner" class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg mt-4">
+      <section id="gantt-planner" class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg mt-4 flex flex-col flex-1 min-h-0">
         <h2 class="text-md font-semibold text-gray-100 mb-2">Project Timeline (by Team)</h2>
         <div class="flex flex-wrap gap-3 mb-4 items-center">
             <label for="filter-team" class="text-gray-200">Filter by Team:</label>
@@ -267,7 +272,9 @@
 
             <button id="btn-clear-filters" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 transition ease-in-out duration-150">Clear Filters</button>
         </div>
-        <!-- Gantt chart will be dynamically inserted here -->
+        <div id="gantt-chart-container" class="flex-1 min-h-0 relative">
+            <!-- Gantt chart will be dynamically inserted here -->
+        </div>
         </section>
     </section>
 
@@ -364,47 +371,6 @@
       return BASE_COLORS_PALETTE[Math.abs(hash % BASE_COLORS_PALETTE.length)];
     }
     
-    // PDF Download Function
-    async function downloadPdf() {
-        const btn = document.getElementById('btn-download-pdf');
-        if (!window.jspdf || !window.html2canvas) {
-            showCustomAlert("Error", "PDF libraries are still loading. Please try again in a moment.");
-            return;
-        }
-        
-        const originalText = btn.textContent;
-        btn.textContent = 'Generating...';
-        btn.disabled = true;
-
-        const contentToCapture = document.getElementById(currentView === 'planner' ? 'planner-view' : 'dashboard-view');
-        
-        try {
-            const canvas = await html2canvas(contentToCapture, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#091423'
-            });
-
-            const { jsPDF } = window.jspdf;
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
-            });
-
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-            pdf.save(`Project-${currentView}.pdf`);
-        } catch (error) {
-            console.error("Error generating PDF:", error);
-            showCustomAlert("Error", "Could not generate PDF. Please try again.");
-        } finally {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        }
-    }
-
-
     // =================================================================================
     // MAIN APPLICATION SCRIPT
     // Encapsulated in an IIFE to prevent global scope pollution.
@@ -450,6 +416,7 @@
       const ganttPlanner = document.getElementById('gantt-planner');
       const filterTeamSelect = document.getElementById('filter-team');
       const filterStatusSelect = document.getElementById('filter-status');
+      const btnClearFilters = document.getElementById('btn-clear-filters');
 
       // --- Data Persistence ---
       function loadAll() {
@@ -459,6 +426,68 @@
       function saveAll() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
         localStorage.setItem(TEAMS_KEY, JSON.stringify(teams));
+      }
+
+      // --- PDF Download Function ---
+      async function downloadPdf() {
+          const btn = document.getElementById('btn-download-pdf');
+          if (!window.jspdf || !window.html2canvas) {
+              showCustomAlert("Error", "PDF libraries are still loading. Please try again in a moment.");
+              return;
+          }
+
+          const originalText = btn.textContent;
+          btn.textContent = 'Generating...';
+          btn.disabled = true;
+
+          const contentToCapture = document.getElementById(currentView === 'planner' ? 'planner-view' : 'dashboard-view');
+          const viewports = contentToCapture.querySelectorAll('.gantt-viewport, .timeline-viewport');
+
+          // Temporarily expand scrollable areas to capture full content
+          viewports.forEach(vp => {
+              vp.style.overflowX = 'visible';
+              vp.style.width = vp.scrollWidth + 'px';
+          });
+
+          try {
+              const canvas = await html2canvas(contentToCapture, {
+                  scale: 2,
+                  useCORS: true,
+                  backgroundColor: '#091423',
+                  allowTaint: true, 
+                  width: contentToCapture.scrollWidth,
+                  height: contentToCapture.scrollHeight,
+                  windowWidth: contentToCapture.scrollWidth,
+                  windowHeight: contentToCapture.scrollHeight
+              });
+
+              const { jsPDF } = window.jspdf;
+              const imgData = canvas.toDataURL('image/png');
+              const pdfWidth = canvas.width;
+              const pdfHeight = canvas.height;
+              
+              const orientation = pdfWidth > pdfHeight ? 'l' : 'p';
+
+              const pdf = new jsPDF({
+                  orientation: orientation,
+                  unit: 'px',
+                  format: [pdfWidth, pdfHeight]
+              });
+
+              pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+              pdf.save(`Project-${currentView}-${new Date().toISOString().slice(0,10)}.pdf`);
+          } catch (error) {
+              console.error("Error generating PDF:", error);
+              showCustomAlert("Error", "Could not generate PDF. There might be an issue with capturing the content. Please try again.");
+          } finally {
+              // Restore original styles
+              viewports.forEach(vp => {
+                  vp.style.overflowX = 'auto';
+                  vp.style.width = '100%';
+              });
+              btn.textContent = originalText;
+              btn.disabled = false;
+          }
       }
 
       // --- View Management ---
@@ -850,26 +879,38 @@
 
       // --- Gantt Chart Logic ---
       function renderPlannerGantt() {
-        ganttPlanner.innerHTML = '<h2 class="text-md font-semibold text-gray-100 mb-2">Project Timeline (by Team)</h2>';
+        const ganttContainer = document.getElementById('gantt-chart-container');
+        if (!ganttContainer) return;
+        ganttContainer.innerHTML = ''; // Clear only the container
+
         const project = projects.find(p => p.id === currentProjectId);
-        if (!project) { ganttPlanner.innerHTML += '<p class="text-gray-400">No project selected.</p>'; return; }
+        if (!project) {
+            ganttContainer.innerHTML = '<p class="text-gray-400">No project selected.</p>';
+            return;
+        }
         
         let allTasks = project.areas.flatMap(a => a.tasks.map(t => ({ ...t, areaName: a.name, areaId: a.id, projectName: project.name })));
         if (currentTeamFilter !== 'all') allTasks = allTasks.filter(t => ((t.team === 'other' && t.teamNameCustom) ? 'other:' + t.teamNameCustom.toLowerCase() : t.team) === currentTeamFilter);
         if (currentStatusFilter !== 'all') allTasks = allTasks.filter(t => t.status === currentStatusFilter);
         
-        if (allTasks.length === 0) { ganttPlanner.innerHTML += '<div class="text-center border border-dashed border-gray-600 rounded-xl p-8 text-gray-400">No tasks match the current filters.</div>'; return; }
+        if (allTasks.length === 0) {
+            ganttContainer.innerHTML = '<div class="text-center border border-dashed border-gray-600 rounded-xl p-8 text-gray-400">No tasks match the current filters.</div>';
+            return;
+        }
         
         const starts = allTasks.map(t => parseDateDMY(t.startDate)).filter(Boolean);
         const ends = allTasks.map(t => parseDateDMY(t.endDate)).filter(Boolean);
-        if (starts.length === 0 || ends.length === 0) { ganttPlanner.innerHTML += '<p class="text-gray-400">Tasks have invalid dates.</p>'; return; }
+        if (starts.length === 0 || ends.length === 0) {
+            ganttContainer.innerHTML = '<p class="text-gray-400">Tasks have invalid dates.</p>';
+            return;
+        }
         
         const minDate = new Date(Math.min(...starts));
         const maxDate = new Date(Math.max(...ends));
         const totalDays = diffDays(minDate, maxDate) + 1;
         
         const viewport = document.createElement('div');
-        viewport.className = 'gantt-viewport';
+        viewport.className = 'gantt-viewport flex-1';
         
         const monthsRow = document.createElement('div');
         monthsRow.className = 'gantt-months gantt-grid';
@@ -936,7 +977,7 @@
         });
 
         viewport.appendChild(rowContainer);
-        ganttPlanner.appendChild(viewport);
+        ganttContainer.appendChild(viewport);
         
         addTodayMarker(viewport, minDate);
         setupGanttDragAndDrop(viewport, minDate);
@@ -969,7 +1010,8 @@
       }
 
       function drawDependencyArrows(tasks, minDate) {
-          const ganttContainer = ganttPlanner.querySelector('.gantt-viewport');
+          const ganttContainer = document.getElementById('gantt-chart-container');
+          if (!ganttContainer) return;
           let svg = ganttContainer.querySelector('#dependency-lines-svg');
           if (svg) svg.remove();
 
@@ -1008,7 +1050,8 @@
                   svg.appendChild(path);
               }
           });
-          ganttContainer.prepend(svg);
+          const ganttViewport = ganttContainer.querySelector('.gantt-viewport');
+          if(ganttViewport) ganttViewport.prepend(svg);
       }
 
       // --- Task Drag & Drop / Resize Logic ---
@@ -1197,7 +1240,7 @@
         btnAddTeam.onclick = () => showCustomPrompt('New Team', 'Enter team name:', (nm) => { if (!nm) return; const id = nm.toLowerCase().replace(/\s+/g, '-'); if (teams.some(t => t.id === id)) { showCustomAlert('Error', 'A team with that name already exists.'); return; } teams.push({ id, name: nm.trim(), color: '#' + Math.floor(Math.random() * 16777215).toString(16) }); saveAll(); renderLegend(); refreshPlannerUI(); renderFilterOptions(); });
         filterTeamSelect.onchange = (e) => { currentTeamFilter = e.target.value; renderPlannerGantt(); };
         filterStatusSelect.onchange = (e) => { currentStatusFilter = e.target.value; renderPlannerGantt(); };
-        document.getElementById('btn-clear-filters').onclick = () => { currentTeamFilter = 'all'; currentStatusFilter = 'all'; filterTeamSelect.value = 'all'; filterStatusSelect.value = 'all'; renderPlannerGantt(); };
+        btnClearFilters.onclick = () => { currentTeamFilter = 'all'; currentStatusFilter = 'all'; filterTeamSelect.value = 'all'; filterStatusSelect.value = 'all'; renderPlannerGantt(); };
       }
 
       // ===== Dashboard Logic =====
