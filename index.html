@@ -6,7 +6,7 @@
   <title>Enhanced Gypsum Ceiling Projects</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
   <style>
     /* Enhanced Gypsum Ceiling Planner Stylesheet
@@ -132,7 +132,8 @@
       border: 1px solid transparent;
     }
     .task-bar:hover {
-        box-shadow: 0 0 10px 2px color-mix(in srgb, var(--primary) 50%, transparent);
+        /* FIX: Replaced color-mix() with rgba for html2canvas compatibility */
+        box-shadow: 0 0 10px 2px rgba(14, 165, 165, 0.5);
         border-color: var(--primary);
     }
     .task-bar.dragging {
@@ -370,6 +371,18 @@
       let hash = 0; for (let i = 0; i < id.length; i++) { hash = id.charCodeAt(i) + ((hash << 5) - hash); }
       return BASE_COLORS_PALETTE[Math.abs(hash % BASE_COLORS_PALETTE.length)];
     }
+    // FIX: Add a function to convert hex to rgba for html2canvas compatibility
+    function hexToRgba(hex, alpha = 1) {
+        if (!/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+            return `rgba(27, 58, 96, ${alpha})`; // Return a default color if hex is invalid
+        }
+        let c = hex.substring(1).split('');
+        if (c.length === 3) {
+            c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+        }
+        c = '0x' + c.join('');
+        return `rgba(${[(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',')},${alpha})`;
+    }
     
     // =================================================================================
     // MAIN APPLICATION SCRIPT
@@ -451,10 +464,10 @@
 
           try {
               const canvas = await html2canvas(contentToCapture, {
-                  scale: 2,
+                  // REDUCE SIZE: Changed scale from 2 to 1. This significantly reduces pixel count.
+                  scale: 1,
                   useCORS: true,
                   backgroundColor: '#091423',
-                  allowTaint: true, 
                   width: contentToCapture.scrollWidth,
                   height: contentToCapture.scrollHeight,
                   windowWidth: contentToCapture.scrollWidth,
@@ -462,7 +475,8 @@
               });
 
               const { jsPDF } = window.jspdf;
-              const imgData = canvas.toDataURL('image/png');
+              // REDUCE SIZE: Changed format to JPEG with quality 0.9 for smaller file size.
+              const imgData = canvas.toDataURL('image/jpeg', 0.9);
               const pdfWidth = canvas.width;
               const pdfHeight = canvas.height;
               
@@ -474,7 +488,8 @@
                   format: [pdfWidth, pdfHeight]
               });
 
-              pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+              // REDUCE SIZE: Using 'JPEG' format in the PDF.
+              pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
               pdf.save(`Project-${currentView}-${new Date().toISOString().slice(0,10)}.pdf`);
           } catch (error) {
               console.error("Error generating PDF:", error);
@@ -494,12 +509,12 @@
       function showPlannerView() {
         plannerView.classList.remove('hidden'); dashboardView.classList.add('hidden');
         btnToggleView.textContent = 'Switch to Dashboard'; appTitle.textContent = 'Modern Gypsum Ceiling Projects';
-        mainDownloadButton.onclick = downloadPdf; currentView = 'planner'; initPlanner();
+        currentView = 'planner'; initPlanner();
       }
       function showDashboardView() {
         plannerView.classList.add('hidden'); dashboardView.classList.remove('hidden');
         btnToggleView.textContent = 'Back to Planner'; appTitle.textContent = 'Team Activity Dashboard';
-        mainDownloadButton.onclick = downloadPdf; currentView = 'dashboard'; initDashboard();
+        currentView = 'dashboard'; initDashboard();
       }
 
       // --- Initialization ---
@@ -945,7 +960,8 @@
             
             const areaCanvas = document.createElement('div');
             areaCanvas.className = 'task-bar-container';
-            areaCanvas.style.backgroundColor = `color-mix(in srgb, ${getBaseColor(teamKey)} 85%, black)`;
+            // FIX: Replaced color-mix() with a call to hexToRgba for compatibility
+            areaCanvas.style.backgroundColor = hexToRgba(getBaseColor(teamKey), 0.15);
             
             areaTasks.sort((a, b) => parseDateDMY(a.startDate) - parseDateDMY(b.startDate));
             areaTasks.forEach(t => {
@@ -1230,6 +1246,7 @@
 
       // --- Event Listeners Setup ---
       function setupEventListeners() {
+        mainDownloadButton.addEventListener('click', downloadPdf);
         btnNewProject.onclick = () => showCustomPrompt('New Project', 'Enter project name:', (name) => { if (!name) return; const p = { id: generateUUID(), name: name.trim(), archived: false, areas: [] }; projects.push(p); currentProjectId = p.id; saveAll(); refreshPlannerUI(); });
         btnArchiveProject.onclick = () => { const p = projects.find(x => x.id === currentProjectId); if (!p) return; const action = p.archived ? 'unarchive' : 'archive'; showCustomConfirm(`Confirm ${action}`, `Are you sure?`, () => { p.archived = !p.archived; saveAll(); refreshPlannerUI(); }); };
         btnDeleteProject.onclick = () => { if (!currentProjectId) return; showCustomConfirm('Delete Project', 'Permanently delete this project and all its data?', () => { projects = projects.filter(p => p.id !== currentProjectId); if (projects.length === 0) createDefaultProject(); currentProjectId = (projects.filter(p => !p.archived)[0] || projects[0]).id; saveAll(); refreshPlannerUI(); }); };
@@ -1318,7 +1335,8 @@
               row.innerHTML = `<div class="label-cell timeline-area-label" style="background-color:${getBaseColor(areaTasks[0].team)}">${areaName}</div>`;
               const canvas = document.createElement('div');
               canvas.className = 'task-bar-container';
-              canvas.style.backgroundColor = `color-mix(in srgb, ${getBaseColor(areaTasks[0].team)} 85%, black)`;
+              // FIX: Replaced color-mix() with a call to hexToRgba for compatibility
+              canvas.style.backgroundColor = hexToRgba(getBaseColor(areaTasks[0].team), 0.15);
               areaTasks.sort((a,b) => parseDateDMY(a.startDate) - parseDateDMY(b.startDate)).forEach(t => {
                 const s = parseDateDMY(t.startDate), e = parseDateDMY(t.endDate);
                 if (!s || !e) return;
